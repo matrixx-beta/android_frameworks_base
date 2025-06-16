@@ -123,7 +123,6 @@ public class PixelPropsUtils {
             "com.google.android.wallpaper.effects",
             "com.google.pixel.livewallpaper",
             "com.google.android.apps.nexuslauncher",
-            "com.google.android.inputmethod.latin",
             "com.google.android.tts",
             "com.netflix.mediaclient"
         };
