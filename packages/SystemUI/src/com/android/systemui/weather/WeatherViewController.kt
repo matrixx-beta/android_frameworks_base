@@ -46,7 +46,6 @@ class WeatherViewController(
 
     private val weatherSettingsFlow =
         flow {
-            
                 var lastSettings: WeatherSettings? = null
 
                 while (currentCoroutineContext().isActive) {
@@ -57,9 +56,10 @@ class WeatherViewController(
                     }
                     delay(1000)
                 }
+            }
+            delay(5000)
         }
-        .flowOn(Dispatchers.IO)
-        .stateIn(scope, SharingStarted.Eagerly, getWeatherSettings())
+    }.stateIn(scope, SharingStarted.Eagerly, getWeatherSettings())
 
     fun init() {
         scope.launch {
@@ -112,12 +112,11 @@ class WeatherViewController(
             weatherClient.removeObserver(this)
             hideAllViews()
             weatherClient.removeObserver(this@WeatherViewController)
-        } 
-        scope.launch {
-            updateViewVisibility(weatherInfoView, isVisible)
-            updateViewVisibility(weatherIcon, isVisible)
-            updateViewVisibility(weatherTemp, isVisible)
-	}
+        } else {
+            weatherClient.addObserver(this@WeatherViewController)
+            updateWeather()
+            showAllViews()
+        }
     }
 
     override fun weatherUpdated() = updateWeather()
