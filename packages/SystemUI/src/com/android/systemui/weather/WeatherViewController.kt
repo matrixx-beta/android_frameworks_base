@@ -42,20 +42,36 @@ class WeatherViewController(
     private var weatherInfo: OmniJawsClient.WeatherInfo? = null
     private val scope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
 
-    private var isVisible = false
+    private var mDozing = false
+    private val statusBarStateController: StatusBarStateController = Dependency.get(StatusBarStateController::class.java)
 
-    private val weatherSettingsFlow =
-        flow {
-                var lastSettings: WeatherSettings? = null
+    private val statusBarStateListener = object : StatusBarStateController.StateListener {
+        override fun onStateChanged(newState: Int) {}
 
-                while (currentCoroutineContext().isActive) {
-                    val currentSettings = getWeatherSettings()
-                    if (currentSettings != lastSettings) {
-                        emit(currentSettings)
-                        lastSettings = currentSettings
-                    }
-                    delay(1000)
-                }
+        override fun onDozingChanged(dozing: Boolean) {
+            if (mDozing == dozing) return
+            mDozing = dozing
+
+            val weatherEnabled = weatherSettingsFlow.value.weatherEnabled
+
+            if (mDozing || !weatherEnabled) {
+                hideAllViews()
+                weatherClient.removeObserver(this@WeatherViewController)
+            } else {
+                weatherClient.addObserver(this@WeatherViewController)
+                updateWeather()
+                showAllViews()
+            }
+        }
+    }
+
+    private val weatherSettingsFlow = flow {
+        var previousSettings: WeatherSettings? = null
+        while (true) {
+            val currentSettings = getWeatherSettings()
+            if (currentSettings != previousSettings) {
+                emit(currentSettings)
+                previousSettings = currentSettings
             }
             delay(5000)
         }
@@ -63,8 +79,10 @@ class WeatherViewController(
 
     fun init() {
         scope.launch {
-            weatherSettingsFlow.collectLatest { settings -> applyWeatherSettings(settings) }
+            weatherSettingsFlow.collectLatest { applyWeatherSettings(it) }
         }
+        statusBarStateController.addCallback(statusBarStateListener)
+        statusBarStateListener.onDozingChanged(statusBarStateController.isDozing())
     }
 
     private fun getConditionText(condition: String): String {
@@ -93,23 +111,7 @@ class WeatherViewController(
         Settings.System.getIntForUser(context.contentResolver, setting, defaultValue, UserHandle.USER_CURRENT) != 0
 
     private fun applyWeatherSettings(settings: WeatherSettings) {
-        updateVisibility(settings)
-        if (isVisible && weatherInfo != null) {
-            weatherTemp.text = buildWeatherText(weatherInfo!!)
-        }
-    }
-
-    private fun updateVisibility(settings: WeatherSettings = weatherSettingsFlow.value) {
-        val shouldBeVisible = settings.weatherEnabled
-        if (shouldBeVisible == isVisible) return
-
-        isVisible = shouldBeVisible
-
-        if (isVisible) {
-            weatherClient.addObserver(this)
-            updateWeather()
-        } else {
-            weatherClient.removeObserver(this)
+        if (mDozing || !settings.weatherEnabled) {
             hideAllViews()
             weatherClient.removeObserver(this@WeatherViewController)
         } else {
@@ -178,6 +180,7 @@ class WeatherViewController(
     fun removeObserver() {
         scope.cancel()
         weatherClient.removeObserver(this)
+        statusBarStateController.removeCallback(statusBarStateListener)
     }
 
     private suspend fun updateViewVisibility(view: View, visible: Boolean) {
