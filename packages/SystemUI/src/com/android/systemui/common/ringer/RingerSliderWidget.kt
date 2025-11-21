@@ -65,7 +65,7 @@ fun RingerSliderWidget(
     Box(
         modifier = modifier
             .height(dimens.thumbSize)
-            .background(if (isDozing) Color.Transparent else theme.neutralBg, CircleShape)
+            .background(Color.Transparent, CircleShape)
             .clip(CircleShape)
             .then(if (isDozing)
                 Modifier.border(theme.dozeStroke, Color.White, CircleShape)
